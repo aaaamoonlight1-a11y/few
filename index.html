@@ -1,61 +1,294 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HLS Player</title>
-</head>
-<body>
-
-<video id="video" playsinline width="100%"></video>
-
-<br>
-
-<button id="play">Play</button>
-
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 30px;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.player {
+    position: relative;
+    width: 100%;
+    max-width: 850px;
+    margin: auto;
+    background: #000;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.center-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 76px;
+    height: 76px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,.95);
+    color: black;
+    font-size: 30px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    z-index: 3;
+}
+
+.center-play:hover {
+    background: white;
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 35px 14px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,.85));
+    opacity: 0;
+    transition: opacity .2s;
+    z-index: 4;
+    cursor: default;
+}
+
+.player:hover .controls,
+.player.paused .controls {
+    opacity: 1;
+}
+
+.controls button {
+    border: 0;
+    color: white;
+    background: transparent;
+    font-size: 19px;
+    cursor: pointer;
+}
+
+.progress {
+    flex: 1;
+    height: 5px;
+    background: #777;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.progress-fill {
+    width: 0%;
+    height: 100%;
+    background: #f00;
+    border-radius: 5px;
+}
+
+.time {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#status {
+    text-align: center;
+    color: #aaa;
+}
+</style>
+</head>
+
+<body>
+
+<div class="player paused" id="player">
+
+    <video id="video" playsinline preload="auto"></video>
+
+    <button class="center-play" id="bigPlay" aria-label="Play">
+        ▶
+    </button>
+
+    <div class="controls" id="controls">
+
+        <button id="playBtn" aria-label="Play">▶</button>
+
+        <span class="time" id="current">0:00</span>
+
+        <div class="progress" id="progress">
+            <div class="progress-fill" id="fill"></div>
+        </div>
+
+        <span class="time" id="duration">0:00</span>
+
+        <button id="muteBtn" aria-label="Mute">🔊</button>
+
+        <button id="fullscreenBtn" aria-label="Fullscreen">⛶</button>
+
+    </div>
+</div>
+
+<p id="status">Loading stream...</p>
+
 <script>
+const STREAM = "https://aaaamoonlight1-a11y.github.io/few/yidvg3.m3u8";
+
 const video = document.getElementById("video");
-const playButton = document.getElementById("play");
+const player = document.getElementById("player");
+const bigPlay = document.getElementById("bigPlay");
+const playBtn = document.getElementById("playBtn");
+const progress = document.getElementById("progress");
+const fill = document.getElementById("fill");
+const current = document.getElementById("current");
+const duration = document.getElementById("duration");
+const status = document.getElementById("status");
 
-const stream = "https://aaaamoonlight1-a11y.github.io/few/yidvg3.m3u8";
+let hls;
 
-if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = stream;
-}
-else if (Hls.isSupported()) {
-    const hls = new Hls();
+function formatTime(seconds) {
+    if (!Number.isFinite(seconds)) return "0:00";
 
-    hls.loadSource(stream);
-    hls.attachMedia(video);
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
 
-    hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-            console.error("HLS error:", data);
-        }
-    });
-}
-else {
-    document.body.textContent = "HLS is not supported.";
+    return m + ":" + String(s).padStart(2, "0");
 }
 
-playButton.addEventListener("click", () => {
+async function togglePlay() {
     if (video.paused) {
-        video.play().catch(error => console.error(error));
+        try {
+            await video.play();
+        } catch (error) {
+            status.textContent = "Playback failed: " + error.message;
+        }
     } else {
         video.pause();
     }
+}
+
+bigPlay.addEventListener("click", e => {
+    e.stopPropagation();
+    togglePlay();
 });
 
+playBtn.addEventListener("click", togglePlay);
+
+video.addEventListener("click", togglePlay);
+
 video.addEventListener("play", () => {
-    playButton.textContent = "Pause";
+    bigPlay.style.display = "none";
+    playBtn.textContent = "❚❚";
+    player.classList.remove("paused");
+    status.textContent = "Playing";
 });
 
 video.addEventListener("pause", () => {
-    playButton.textContent = "Play";
+    bigPlay.style.display = "grid";
+    playBtn.textContent = "▶";
+    player.classList.add("paused");
 });
 
+video.addEventListener("waiting", () => {
+    status.textContent = "Buffering...";
+});
+
+video.addEventListener("playing", () => {
+    status.textContent = "Playing";
+});
+
+video.addEventListener("timeupdate", () => {
+    current.textContent = formatTime(video.currentTime);
+
+    if (Number.isFinite(video.duration)) {
+        fill.style.width =
+            (video.currentTime / video.duration * 100) + "%";
+    }
+});
+
+video.addEventListener("durationchange", () => {
+    duration.textContent = formatTime(video.duration);
+});
+
+progress.addEventListener("click", e => {
+    if (!Number.isFinite(video.duration)) return;
+
+    const rect = progress.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+
+    video.currentTime = Math.max(
+        0,
+        Math.min(1, percent)
+    ) * video.duration;
+});
+
+document.getElementById("muteBtn").addEventListener("click", e => {
+    video.muted = !video.muted;
+    e.currentTarget.textContent = video.muted ? "🔇" : "🔊";
+});
+
+document.getElementById("fullscreenBtn").addEventListener("click", () => {
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else {
+        player.requestFullscreen?.();
+    }
+});
+
+if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = STREAM;
+    status.textContent = "Stream ready";
+} else if (Hls.isSupported()) {
+    hls = new Hls({
+        enableWorker: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        backBufferLength: 30
+    });
+
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        hls.loadSource(STREAM);
+    });
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        status.textContent = "Ready to play";
+    });
+
+    hls.on(Hls.Events.ERROR, (event, data) => {
+        if (!data.fatal) return;
+
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            status.textContent = "Network error. Retrying...";
+            hls.startLoad();
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+        } else {
+            status.textContent = "Stream error: " + data.details;
+        }
+    });
+} else {
+    status.textContent = "HLS not supported";
+}
+
+window.addEventListener("pagehide", () => {
+    hls?.destroy();
+});
 </script>
 
 </body>
