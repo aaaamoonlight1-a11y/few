@@ -7,12 +7,17 @@
 </head>
 <body>
 
-<video id="video" controls autoplay playsinline width="100%"></video>
+<video id="video" playsinline width="100%"></video>
+
+<br>
+
+<button id="play">Play</button>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 
 <script>
 const video = document.getElementById("video");
+const playButton = document.getElementById("play");
 
 const stream = "https://aaaamoonlight1-a11y.github.io/few/yidvg3.m3u8";
 
@@ -21,10 +26,11 @@ if (video.canPlayType("application/vnd.apple.mpegurl")) {
 }
 else if (Hls.isSupported()) {
     const hls = new Hls();
+
     hls.loadSource(stream);
     hls.attachMedia(video);
 
-    hls.on(Hls.Events.ERROR, function(event, data) {
+    hls.on(Hls.Events.ERROR, (event, data) => {
         if (data.fatal) {
             console.error("HLS error:", data);
         }
@@ -33,6 +39,23 @@ else if (Hls.isSupported()) {
 else {
     document.body.textContent = "HLS is not supported.";
 }
+
+playButton.addEventListener("click", () => {
+    if (video.paused) {
+        video.play().catch(error => console.error(error));
+    } else {
+        video.pause();
+    }
+});
+
+video.addEventListener("play", () => {
+    playButton.textContent = "Pause";
+});
+
+video.addEventListener("pause", () => {
+    playButton.textContent = "Play";
+});
+
 </script>
 
 </body>
